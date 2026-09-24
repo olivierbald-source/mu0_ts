@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>mu0 ENIB</title>
+  <style>
+    :root { color-scheme: light; font-family: Arial, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #172033; background: #f4f7fb; }
+    .workspace { max-width: 1400px; margin: 2rem auto; padding: 0 3%; }
+    .tabs { display: flex; gap: .35rem; overflow-x: auto; margin-bottom: 1rem; padding-bottom: .25rem; border-bottom: 2px solid #d8e0ed; }
+    .tab { flex: 0 0 auto; padding: .75rem 1rem; border: 0; border-bottom: 3px solid transparent; color: #63708a; background: transparent; font: inherit; font-weight: bold; cursor: pointer; }
+    .tab:hover { color: #356ae6; }
+    .tab[aria-selected="true"] { border-bottom-color: #356ae6; color: #172033; }
+    .panel[hidden] { display: none; }
+    .editor-layout { display: grid; grid-template-columns: minmax(500px, .85fr) minmax(560px, 1.15fr); gap: 1rem; align-items: start; }
+    .code-editor { min-width: 0; }
+    .editor { display: flex; min-height: 280px; overflow: hidden; background: #172033; border: 1px solid #2d3b58; border-radius: 12px; box-shadow: 0 4px 18px #17203320; }
+    .line-numbers { flex: 0 0 3.5rem; padding: 1rem .75rem; overflow: hidden; color: #7d8ba8; background: #202c45; font: 0.95rem/1.6 Consolas, "Courier New", monospace; text-align: right; white-space: pre; user-select: none; }
+    .code-area { position: relative; flex: 1; min-width: 0; min-height: 280px; overflow: hidden; }
+    .code-highlight, .code-input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 1rem; border: 0; font: 0.95rem/1.6 Consolas, "Courier New", monospace; tab-size: 2; white-space: pre; }
+    .code-highlight { overflow: hidden; color: #dce7ff; pointer-events: none; }
+    .code-input { z-index: 1; resize: none; outline: 0; overflow: auto; color: transparent; caret-color: #f4f7fb; background: transparent; }
+    .code-input::selection { color: #172033; background: #9fc1ff; }
+    .editor-status { min-height: 1.4rem; margin: .5rem 0 0; color: #63708a; font-size: .75rem; line-height: 1.4; }
+    .editor-status.has-error { color: #c43d4b; font-weight: bold; }
+    .syntax-instruction { color: #78b7ff; font-weight: bold; }
+    .syntax-directive { color: #8fe388; font-weight: bold; }
+    .syntax-label { color: #ffd580; }
+    .syntax-invalid { color: #ff6b6b; text-decoration: underline wavy; text-decoration-color: #ff6b6b; }
+    .syntax-operand { color: #ffd580; }
+    .syntax-comment { color: #7d8ba8; font-style: italic; }
+    .suggestions { display: flex; gap: .35rem; flex-wrap: wrap; min-height: 2.5rem; padding-top: .5rem; }
+    .suggestion { padding: .35rem .6rem; border: 1px solid #b7c7e5; border-radius: 5px; color: #254a88; background: #eaf1ff; font: .85rem Consolas, "Courier New", monospace; cursor: pointer; }
+    .suggestion:hover, .suggestion:focus { color: white; background: #356ae6; outline: 0; }
+    .instruction-panel { min-width: 0; padding: 1rem; overflow-wrap: anywhere; border: 1px solid #d8e0ed; border-radius: 10px; background: white; box-shadow: 0 4px 18px #17203312; }
+    .instruction-panel h2 { margin: 0 0 .75rem; font-size: 1rem; }
+    .instruction-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem .9rem; margin: 0; }
+    .instruction { min-width: 0; padding-bottom: .45rem; border-bottom: 1px solid #e5eaf2; }
+    .instruction:last-child { padding-bottom: 0; border-bottom: 0; }
+    .instruction dt { color: #356ae6; font: bold .82rem Consolas, "Courier New", monospace; }
+    .instruction dd { margin: .2rem 0 0; color: #63708a; font-size: .76rem; line-height: 1.3; overflow-wrap: anywhere; word-break: break-word; }
+    .opcode { display: block; margin-top: .2rem; color: #8a96aa; font: .7rem Consolas, "Courier New", monospace; }
+    .preprocessor-panel { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid #d8e0ed; }
+    .directive dt { color: #4b9b45; }
+    .label-help { display: block; margin-top: .45rem; color: #63708a; font-size: .76rem; line-height: 1.35; }
+    .label-example { display: block; margin-top: .25rem; color: #4b9b45; font: .76rem Consolas, "Courier New", monospace; }
+    .panel-surface { min-height: 280px; padding: 1.25rem; border: 1px solid #d8e0ed; border-radius: 12px; background: white; box-shadow: 0 4px 18px #17203312; }
+    .panel-surface h2 { margin-top: 0; }
+    .compile-output, .execution-output { min-height: 160px; padding: 1rem; overflow: auto; color: #dce7ff; background: #172033; border-radius: 8px; font: .95rem/1.6 Consolas, "Courier New", monospace; white-space: pre-wrap; }
+    .memory-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: .5rem; }
+    .memory-cell { padding: .75rem; border: 1px solid #d8e0ed; border-radius: 6px; background: #f4f7fb; font: .9rem Consolas, "Courier New", monospace; }
+    .memory-cell strong { display: block; color: #63708a; font-size: .75rem; }
+    .action { padding: .7rem 1rem; border: 0; border-radius: 6px; color: white; background: #356ae6; font: inherit; font-weight: bold; cursor: pointer; }
+    @media (max-width: 1100px) { .workspace { padding: 0 3%; } .editor-layout { grid-template-columns: minmax(390px, .9fr) minmax(420px, 1.1fr); } }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="workspace" aria-label="Environnement de développement mu0">
+      <nav class="tabs" aria-label="Vues du programme" role="tablist">
+        <button class="tab" id="tab-editor" role="tab" aria-selected="true" aria-controls="panel-editor" data-panel="panel-editor">Éditeur de code</button>
+        <button class="tab" id="tab-compile" role="tab" aria-selected="false" aria-controls="panel-compile" data-panel="panel-compile">Compilation</button>
+        <button class="tab" id="tab-memory" role="tab" aria-selected="false" aria-controls="panel-memory" data-panel="panel-memory">Mémoire</button>
+        <button class="tab" id="tab-run" role="tab" aria-selected="false" aria-controls="panel-run" data-panel="panel-run">Exécution</button>
+      </nav>
+
+      <section class="panel" id="panel-editor" role="tabpanel" aria-labelledby="tab-editor">
+        <div class="editor-layout">
+          <div class="code-editor">
+            <div class="editor" aria-label="Éditeur de programme">
+              <div class="line-numbers" aria-hidden="true">1</div>
+              <div class="code-area">
+                <pre class="code-highlight" aria-hidden="true"></pre>
+                <textarea class="code-input" spellcheck="false" aria-label="Zone de saisie du programme">LDA 0x010
+ADD 0x011
+STO 0x012
+SUB 0x013</textarea>
+              </div>
+            </div>
+            <div class="editor-status" id="editor-status" aria-live="polite"></div>
+            <div class="suggestions" id="suggestions" aria-label="Suggestions d'instructions" role="listbox" hidden></div>
+          </div>
+          <aside class="instruction-panel" aria-label="Instructions assembleur disponibles">
+            <h2>Instructions disponibles</h2>
+            <dl class="instruction-list">
+              <div class="instruction"><dt>LDA addr</dt><dd><code>ACC &larr; mem<sub>16</sub>[addr]</code><span class="opcode">Code op : 0000</span></dd></div>
+              <div class="instruction"><dt>STO addr</dt><dd><code>mem<sub>16</sub>[addr] &larr; ACC</code><span class="opcode">Code op : 0001</span></dd></div>
+              <div class="instruction"><dt>ADD addr</dt><dd><code>ACC &larr; ACC + mem<sub>16</sub>[addr]</code><span class="opcode">Code op : 0010</span></dd></div>
+              <div class="instruction"><dt>SUB addr</dt><dd><code>ACC &larr; ACC - mem<sub>16</sub>[addr]</code><span class="opcode">Code op : 0011</span></dd></div>
+              <div class="instruction"><dt>JMP addr</dt><dd>Effectue un saut à l’adresse indiquée.<span class="opcode">Code op : 0100</span></dd></div>
+              <div class="instruction"><dt>JGE addr</dt><dd>Effectue un saut si la valeur de l’accumulateur est positive ou nulle.<span class="opcode">Code op : 0101</span></dd></div>
+              <div class="instruction"><dt>JNE addr</dt><dd>Effectue un saut si la valeur de l’accumulateur est non nulle.<span class="opcode">Code op : 0110</span></dd></div>
+              <div class="instruction"><dt>STP</dt><dd>Arrête le microprocesseur.<span class="opcode">Code op : 0111</span></dd></div>
+              <div class="instruction"><dt>AND addr</dt><dd><code>ACC &larr; ACC and mem<sub>16</sub>[addr]</code><span class="opcode">Code op : 1000</span></dd></div>
+              <div class="instruction"><dt>OR addr</dt><dd><code>ACC &larr; ACC or mem<sub>16</sub>[addr]</code><span class="opcode">Code op : 1001</span></dd></div>
+              <div class="instruction"><dt>XOR addr</dt><dd><code>ACC &larr; ACC xor mem<sub>16</sub>[addr]</code><span class="opcode">Code op : 1010</span></dd></div>
+              <div class="instruction"><dt>ROL addr</dt><dd><code>ACC &larr; ACC rol mem<sub>16</sub>[addr]</code> Rotation à gauche<span class="opcode">Code op : 1011</span></dd></div>
+              <div class="instruction"><dt>LDR addr</dt><dd><code>R &larr; addr</code><span class="opcode">Code op : 1100</span></dd></div>
+              <div class="instruction"><dt>LDI</dt><dd><code>ACC &larr; mem<sub>16</sub>[R]</code> ; <code>R &larr; R + 1</code><span class="opcode">Code op : 1101</span></dd></div>
+              <div class="instruction"><dt>STI</dt><dd><code>R &larr; R - 1</code> ; <code>mem<sub>16</sub>[R] &larr; ACC</code><span class="opcode">Code op : 1110</span></dd></div>
+              <div class="instruction"><dt>XPC</dt><dd><code>ACC &harr; PC</code><br>Échange entre ACC et PC.<span class="opcode">Code op : 1111</span></dd></div>
+            </dl>
+            <div class="preprocessor-panel">
+              <h2>Directives du préprocesseur</h2>
+              <dl class="instruction-list">
+                <div class="instruction directive"><dt>.org</dt><dd>Désigne l’adresse mémoire où se trouvent les instructions ou données placées juste après.</dd></div>
+                <div class="instruction directive"><dt>defw</dt><dd>Déclare une donnée de type word (16 bits) à l’adresse du label, avec une valeur initiale.</dd></div>
+                <div class="instruction directive comment-syntax"><dt>; commentaire</dt><dd>Introduit un commentaire jusqu’à la fin de la ligne. Il n’a aucune action.</dd></div>
+                <div class="instruction directive label-help-item"><dt>Label</dt><dd><span class="label-help">Un label est un mot-clé (de 8 caractères) désignant plus simplement une adresse mémoire. loop et x sont des labels dans l’exemple ci-dessous.</span><code class="label-example">loop&nbsp;&nbsp;LDA&nbsp;&nbsp;x</code></dd></div>
+              </dl>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="panel panel-surface" id="panel-compile" role="tabpanel" aria-labelledby="tab-compile" hidden>
+        <h2>Compilation</h2>
+        <p>Assemblez le programme actuellement présent dans l’éditeur.</p>
+        <button class="action" id="compile-button" type="button">Compiler le code</button>
+        <pre class="compile-output" id="compile-output">En attente de compilation.</pre>
+      </section>
+
+      <section class="panel panel-surface" id="panel-memory" role="tabpanel" aria-labelledby="tab-memory" hidden>
+        <h2>Mémoire de l’émulateur</h2>
+        <div class="memory-grid" aria-label="Contenu de la mémoire">
+          <div class="memory-cell"><strong>0x0000</strong>0000</div>
+          <div class="memory-cell"><strong>0x0001</strong>0000</div>
+          <div class="memory-cell"><strong>0x0002</strong>0000</div>
+          <div class="memory-cell"><strong>0x0003</strong>0000</div>
+          <div class="memory-cell"><strong>0x0004</strong>0000</div>
+          <div class="memory-cell"><strong>0x0005</strong>0000</div>
+        </div>
+      </section>
+
+      <section class="panel panel-surface" id="panel-run" role="tabpanel" aria-labelledby="tab-run" hidden>
+        <h2>Exécution du code compilé</h2>
+        <button class="action" id="run-button" type="button">Exécuter</button>
+        <pre class="execution-output" id="execution-output">Le programme compilé n’a pas encore été exécuté.</pre>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const codeInput = document.querySelector('.code-input');
+    const lineNumbers = document.querySelector('.line-numbers');
+    const codeHighlight = document.querySelector('.code-highlight');
+    const editorStatus = document.querySelector('#editor-status');
+    const suggestions = document.querySelector('#suggestions');
+    const instructionNames = ['LDA', 'STO', 'ADD', 'SUB', 'JMP', 'JGE', 'JNE', 'STP', 'AND', 'OR', 'XOR', 'ROL', 'LDR', 'LDI', 'STI', 'XPC'];
+    const directiveNames = ['.org', 'defw'];
+    const addressInstructionNames = new Set(['LDA', 'STO', 'ADD', 'SUB', 'JMP', 'JGE', 'JNE', 'AND', 'OR', 'XOR', 'ROL', 'LDR', '.org']);
+    let suggestionIndex = 0;
+
+    function escapeHtml(value) {
+      return value.replace(/[&<>"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[character]));
+    }
+
+    function validateLine(line) {
+      const code = line.split(';')[0];
+      const tokens = code.trim().split(/\s+/).filter(Boolean);
+      if (tokens.length === 0) return null;
+
+      let label = '';
+      let instructionToken = tokens[0];
+      let operand = tokens[1];
+      const firstToken = tokens[0].toUpperCase();
+      const isDirective = directiveNames.includes(tokens[0].toLowerCase());
+      const isInstruction = instructionNames.includes(firstToken);
+
+      if (!isDirective && !isInstruction) {
+        label = tokens[0];
+        instructionToken = tokens[1];
+        operand = tokens[2];
+      }
+
+      if (!instructionToken) return null;
+      if (label && label.length > 8) {
+        return { addressToken: label, error: `Label trop long : ${label} (8 caractères maximum).` };
+      }
+      const instruction = instructionToken.startsWith('.') ? instructionToken.toLowerCase() : instructionToken.toUpperCase();
+      if (instruction === 'DEFW') {
+        if (!label) return { error: 'La directive defw doit être précédée par un label.' };
+        if (!operand) return { error: 'Valeur manquante pour defw (mot 16 bits attendu).' };
+        const value = /^0x[0-9a-fA-F]{4}$/.test(operand) ? Number.parseInt(operand, 16) : /^\d+$/.test(operand) ? Number(operand) : NaN;
+        if (!Number.isInteger(value) || value < 0 || value > 0xffff) {
+          return { addressToken: operand, error: `Valeur invalide : ${operand} (mot 16 bits attendu : 0 à 0xFFFF).` };
+        }
+        return null;
+      }
+
+      if (!addressInstructionNames.has(instruction)) return null;
+      if (!operand) return { error: 'Adresse manquante (format attendu : 0x000 à 0xFFF ou un label).' };
+      if (!/^0x[0-9a-fA-F]{3}$/.test(operand) && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(operand)) {
+        return { addressToken: operand, error: `Adresse invalide : ${operand} (format attendu : 0x000 à 0xFFF ou un label).` };
+      }
+      return null;
+    }
+
+    function formatInstructionLine(line) {
+      const commentIndex = line.indexOf(';');
+      const code = commentIndex >= 0 ? line.slice(0, commentIndex) : line;
+      const comment = commentIndex >= 0 ? line.slice(commentIndex) : '';
+      const tokens = code.trim().split(/\s+/).filter(Boolean);
+      if (tokens.length === 0) return line;
+
+      const firstToken = tokens[0].toUpperCase();
+      const hasLabel = !instructionNames.includes(firstToken) && !directiveNames.includes(tokens[0].toLowerCase());
+      const instructionIndex = hasLabel ? 1 : 0;
+      const instruction = tokens[instructionIndex];
+      const isDefw = instruction?.toLowerCase() === 'defw';
+      if (!instruction || (!instructionNames.includes(instruction.toUpperCase()) && !isDefw)) return line;
+      const normalizedInstruction = isDefw ? 'defw' : instruction.toUpperCase();
+      const operands = tokens.slice(instructionIndex + 1).join(' ');
+      const statement = operands ? `${normalizedInstruction} ${operands}` : normalizedInstruction;
+      const formatted = hasLabel ? `${tokens[0].padEnd(8, ' ')} ${statement}` : `         ${statement}`;
+      return `${formatted}${comment ? ` ${comment.trim()}` : ''}`;
+    }
+
+    function formatProgram() {
+      const originalValue = codeInput.value;
+      const formattedValue = originalValue.split('\n').map(formatInstructionLine).join('\n');
+      if (formattedValue !== originalValue) {
+        codeInput.value = formattedValue;
+      }
+    }
+
+    function highlightLine(line, validation) {
+      const tokenPattern = /(;.*$|\.(?:org)\b|\bdefw\b|\b(?:LDA|STO|ADD|SUB|JMP|JGE|JNE|STP|AND|OR|XOR|ROL|LDR|LDI|STI|XPC)\b|\b[A-Za-z_][A-Za-z0-9_]*\b|\b(?:0x[0-9a-fA-F]+|\d+)\b)/g;
+      let highlighted = '';
+      let lastIndex = 0;
+      let match;
+      const firstTokenIndex = line.search(/\S/);
+      const labelMatch = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s+(?=(?:defw|LDA|STO|ADD|SUB|JMP|JGE|JNE|STP|AND|OR|XOR|ROL|LDR|LDI|STI|XPC)\b)/i);
+      const labelIndex = labelMatch ? line.indexOf(labelMatch[1], firstTokenIndex) : -1;
+
+      while ((match = tokenPattern.exec(line)) !== null) {
+        highlighted += escapeHtml(line.slice(lastIndex, match.index));
+        const token = match[0];
+        const isFirstToken = match.index === firstTokenIndex;
+        const isLabel = match.index === labelIndex;
+        const isOperand = /^(?:0x[0-9a-fA-F]+|\d+)$/.test(token);
+        const isSymbolicOperand = /^[A-Za-z_][A-Za-z0-9_]*$/.test(token)
+          && !isFirstToken
+          && !instructionNames.includes(token.toUpperCase())
+          && !directiveNames.includes(token.toLowerCase());
+        const isInvalidAddress = validation?.addressToken === token;
+        const className = token.startsWith(';')
+          ? 'syntax-comment'
+          : directiveNames.includes(token.toLowerCase())
+            ? 'syntax-directive'
+          : isLabel || isSymbolicOperand
+            ? 'syntax-label'
+          : instructionNames.includes(token.toUpperCase())
+            ? 'syntax-instruction'
+            : isInvalidAddress
+              ? 'syntax-invalid'
+            : isOperand
+              ? 'syntax-operand'
+              : isFirstToken
+                ? 'syntax-invalid'
+                : '';
+        highlighted += className
+          ? `<span class="${className}">${escapeHtml(token)}</span>`
+          : escapeHtml(token);
+        lastIndex = tokenPattern.lastIndex;
+      }
+
+      return highlighted + escapeHtml(line.slice(lastIndex));
+    }
+
+    function normalizeInstructions() {
+      const originalValue = codeInput.value;
+      const selectionStart = codeInput.selectionStart;
+      const selectionEnd = codeInput.selectionEnd;
+      const normalizedValue = originalValue.split('\n').map((line) => line.replace(/^([ \t]*)([A-Za-z_][A-Za-z0-9_]*)\b/, (match, indentation, typedName) => {
+        const instruction = instructionNames.find((name) => name === typedName.toUpperCase());
+        return instruction ? `${indentation}${instruction}` : match;
+      })).join('\n');
+
+      if (normalizedValue !== originalValue) {
+        codeInput.value = normalizedValue;
+        codeInput.setSelectionRange(selectionStart, selectionEnd);
+      }
+    }
+
+    function updateLineNumbers() {
+      const lineCount = codeInput.value.split('\n').length;
+      lineNumbers.textContent = Array.from({ length: lineCount }, (_, index) => index + 1).join('\n');
+    }
+
+    function updateHighlight() {
+      codeHighlight.innerHTML = codeInput.value.split('\n').map((line) => highlightLine(line, validateLine(line))).join('\n');
+    }
+
+    function updateValidation() {
+      const errors = codeInput.value.split('\n').map((line, index) => ({ index: index + 1, validation: validateLine(line) })).filter((item) => item.validation);
+      editorStatus.classList.toggle('has-error', errors.length > 0);
+      editorStatus.textContent = errors.length
+        ? errors.map((item) => `Ligne ${item.index} : ${item.validation.error}`).join(' ')
+        : 'Adresses : 0x000 à 0xFFF | Données ACC : 16 bits, 0x0000 à 0xFFFF.';
+    }
+
+    function syncEditorScroll() {
+      lineNumbers.scrollTop = codeInput.scrollTop;
+      codeHighlight.scrollTop = codeInput.scrollTop;
+      codeHighlight.scrollLeft = codeInput.scrollLeft;
+    }
+
+    function updateEditor() {
+      normalizeInstructions();
+      updateLineNumbers();
+      updateHighlight();
+      updateValidation();
+      syncEditorScroll();
+      updateSuggestions();
+    }
+
+    function insertInstruction(instruction) {
+      const cursor = codeInput.selectionStart;
+      const beforeCursor = codeInput.value.slice(0, cursor);
+      const lineStart = beforeCursor.lastIndexOf('\n') + 1;
+      const currentLine = beforeCursor.slice(lineStart);
+      const wordStart = lineStart + currentLine.search(/[A-Za-z]*$/);
+      codeInput.setRangeText(`${instruction} `, wordStart, cursor, 'end');
+      codeInput.focus();
+      updateEditor();
+    }
+
+    function updateSuggestions() {
+      const cursor = codeInput.selectionStart;
+      const beforeCursor = codeInput.value.slice(0, cursor);
+      const currentLine = beforeCursor.slice(beforeCursor.lastIndexOf('\n') + 1);
+      const match = currentLine.match(/^\s*(\.[A-Za-z]*|[A-Za-z]*)$/);
+      const prefix = match ? match[1] : '';
+      const availableNames = [...instructionNames, ...directiveNames];
+      const matches = prefix
+        ? availableNames.filter((name) => name.toUpperCase().startsWith(prefix.toUpperCase()))
+        : [];
+
+      suggestions.innerHTML = '';
+      suggestionIndex = 0;
+      suggestions.hidden = matches.length === 0;
+      matches.forEach((instruction) => {
+        const suggestion = document.createElement('button');
+        suggestion.className = 'suggestion';
+        suggestion.type = 'button';
+        suggestion.setAttribute('role', 'option');
+        suggestion.textContent = instruction;
+        suggestion.addEventListener('click', () => insertInstruction(instruction));
+        suggestions.appendChild(suggestion);
+      });
+    }
+
+    function chooseSuggestion() {
+      const choice = suggestions.querySelectorAll('.suggestion')[suggestionIndex];
+      if (choice) {
+        insertInstruction(choice.textContent);
+        return true;
+      }
+      return false;
+    }
+
+    codeInput.addEventListener('input', updateEditor);
+    codeInput.addEventListener('click', updateSuggestions);
+    codeInput.addEventListener('keyup', updateEditor);
+    codeInput.addEventListener('change', updateEditor);
+    codeInput.addEventListener('blur', () => {
+      formatProgram();
+      updateEditor();
+    });
+    codeInput.addEventListener('scroll', syncEditorScroll);
+    codeInput.addEventListener('keydown', (event) => {
+      const availableSuggestions = suggestions.querySelectorAll('.suggestion');
+      if (suggestions.hidden || availableSuggestions.length === 0) return;
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        suggestionIndex = (suggestionIndex + 1) % availableSuggestions.length;
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        suggestionIndex = (suggestionIndex - 1 + availableSuggestions.length) % availableSuggestions.length;
+      } else if (event.key === 'Tab' || event.key === 'Enter') {
+        event.preventDefault();
+        chooseSuggestion();
+      } else if (event.key === 'Escape') {
+        suggestions.hidden = true;
+      }
+    });
+    updateEditor();
+
+    document.querySelectorAll('.tab').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach((item) => {
+          item.setAttribute('aria-selected', item === tab ? 'true' : 'false');
+        });
+        document.querySelectorAll('.panel').forEach((panel) => {
+          panel.hidden = panel.id !== tab.dataset.panel;
+        });
+      });
+    });
+
+    document.querySelector('#compile-button').addEventListener('click', () => {
+      const lineCount = codeInput.value.split('\n').length;
+      document.querySelector('#compile-output').textContent = `Compilation réussie. ${lineCount} lignes analysées.`;
+    });
+
+    document.querySelector('#run-button').addEventListener('click', () => {
+      document.querySelector('#execution-output').textContent = 'Exécution terminée. Sortie : Bonjour, mu0 ENIB !';
+    });
+  </script>
+</body>
+</html>
