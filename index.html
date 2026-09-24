@@ -34,7 +34,7 @@
     .suggestions { display: flex; gap: .35rem; flex-wrap: wrap; min-height: 2.5rem; padding-top: .5rem; }
     .suggestion { padding: .35rem .6rem; border: 1px solid #b7c7e5; border-radius: 5px; color: #254a88; background: #eaf1ff; font: .85rem Consolas, "Courier New", monospace; cursor: pointer; }
     .suggestion:hover, .suggestion:focus { color: white; background: #356ae6; outline: 0; }
-    .instruction-panel { min-width: 0; padding: 1rem; overflow-wrap: anywhere; border: 1px solid #d8e0ed; border-radius: 10px; background: white; box-shadow: 0 4px 18px #17203312; }
+    .instruction-panel { position: relative; min-width: 0; padding: 1rem; overflow-wrap: anywhere; border: 1px solid #d8e0ed; border-radius: 10px; background: white; box-shadow: 0 4px 18px #17203312; }
     .instruction-panel h2 { margin: 0 0 .75rem; font-size: 1rem; }
     .instruction-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem .9rem; margin: 0; }
     .instruction { min-width: 0; padding-bottom: .45rem; border-bottom: 1px solid #e5eaf2; }
@@ -44,6 +44,9 @@
     .opcode { display: block; margin-top: .2rem; color: #8a96aa; font: .7rem Consolas, "Courier New", monospace; }
     .preprocessor-panel { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid #d8e0ed; }
     .directive dt { color: #4b9b45; }
+    .instruction-panel > h2, .instruction-panel > dl, .instruction-panel > .preprocessor-panel { position: relative; z-index: 1; }
+    .enib-logo { position: absolute; right: 1rem; bottom: 1rem; z-index: 0; display: flex; justify-content: center; align-items: center; width: 45%; height: 90px; margin: 0; overflow: hidden; opacity: .18; pointer-events: none; }
+    .enib-logo img { max-width: 100%; max-height: 80px; object-fit: contain; }
     .label-help { display: block; margin-top: .45rem; color: #63708a; font-size: .76rem; line-height: 1.35; }
     .label-example { display: block; margin-top: .25rem; color: #4b9b45; font: .76rem Consolas, "Courier New", monospace; }
     .panel-surface { min-height: 280px; padding: 1.25rem; border: 1px solid #d8e0ed; border-radius: 12px; background: white; box-shadow: 0 4px 18px #17203312; }
@@ -102,6 +105,9 @@ SUB 0x013</textarea>
               <div class="instruction"><dt>STI</dt><dd><code>R &larr; R - 1</code> ; <code>mem<sub>16</sub>[R] &larr; ACC</code><span class="opcode">Code op : 1110</span></dd></div>
               <div class="instruction"><dt>XPC</dt><dd><code>ACC &harr; PC</code><br>Échange entre ACC et PC.<span class="opcode">Code op : 1111</span></dd></div>
             </dl>
+            <div class="enib-logo" aria-hidden="true">
+              <img src="Enib_inp_2025.png" alt="">
+            </div>
             <div class="preprocessor-panel">
               <h2>Directives du préprocesseur</h2>
               <dl class="instruction-list">
