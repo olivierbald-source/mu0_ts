@@ -112,7 +112,7 @@ SUB 0x013</textarea>
               <h2>Directives du préprocesseur</h2>
               <dl class="instruction-list">
                 <div class="instruction directive"><dt>.org</dt><dd>Désigne l’adresse mémoire où se trouvent les instructions ou données placées juste après.</dd></div>
-                <div class="instruction directive"><dt>defw</dt><dd>Déclare une donnée de type word (16 bits) à l’adresse du label, avec une valeur initiale.</dd></div>
+                <div class="instruction directive"><dt>defw</dt><dd>Déclare une donnée de type word (16 bits) à l’adresse du label, avec une valeur initiale en décimal ou en hexadécimal.<code class="label-example">x&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;defw&nbsp;10<br>y&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;defw&nbsp;0xf</code></dd></div>
                 <div class="instruction directive comment-syntax"><dt>; commentaire</dt><dd>Introduit un commentaire jusqu’à la fin de la ligne. Il n’a aucune action.</dd></div>
                 <div class="instruction directive label-help-item"><dt>Label</dt><dd><span class="label-help">Un label est un mot-clé (de 8 caractères) désignant plus simplement une adresse mémoire. loop et x sont des labels dans l’exemple ci-dessous.</span><code class="label-example">loop&nbsp;&nbsp;LDA&nbsp;&nbsp;x</code></dd></div>
               </dl>
@@ -189,7 +189,7 @@ SUB 0x013</textarea>
       if (instruction === 'DEFW') {
         if (!label) return { error: 'La directive defw doit être précédée par un label.' };
         if (!operand) return { error: 'Valeur manquante pour defw (mot 16 bits attendu).' };
-        const value = /^0x[0-9a-fA-F]{4}$/.test(operand) ? Number.parseInt(operand, 16) : /^\d+$/.test(operand) ? Number(operand) : NaN;
+        const value = /^0x[0-9a-fA-F]{1,4}$/.test(operand) ? Number.parseInt(operand, 16) : /^\d+$/.test(operand) ? Number(operand) : NaN;
         if (!Number.isInteger(value) || value < 0 || value > 0xffff) {
           return { addressToken: operand, error: `Valeur invalide : ${operand} (mot 16 bits attendu : 0 à 0xFFFF).` };
         }
