@@ -51,12 +51,26 @@
     .label-example { display: block; margin-top: .25rem; color: #4b9b45; font: .76rem Consolas, "Courier New", monospace; }
     .panel-surface { min-height: 280px; padding: 1.25rem; border: 1px solid #d8e0ed; border-radius: 12px; background: white; box-shadow: 0 4px 18px #17203312; }
     .panel-surface h2 { margin-top: 0; }
-    .compile-output, .execution-output { min-height: 160px; padding: 1rem; overflow: auto; color: #dce7ff; background: #172033; border-radius: 8px; font: .95rem/1.6 Consolas, "Courier New", monospace; white-space: pre-wrap; }
-    .memory-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: .5rem; }
-    .memory-cell { padding: .75rem; border: 1px solid #d8e0ed; border-radius: 6px; background: #f4f7fb; font: .9rem Consolas, "Courier New", monospace; }
-    .memory-cell strong { display: block; color: #63708a; font-size: .75rem; }
+    .execution-layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 1rem; align-items: start; }
+      .execution-layout { display: grid; grid-template-columns: minmax(0, .65fr) minmax(0, 1.35fr); gap: 1rem; align-items: start; }
+    .execution-column { min-width: 0; }
+    .execution-column h2 { margin: 0 0 .75rem; font-size: 1rem; }
+    .readonly-editor { display: flex; min-height: 420px; overflow: hidden; border: 1px solid #2d3b58; border-radius: 8px; background: #172033; }
+    .readonly-gutter { flex: 0 0 3.5rem; padding: 1rem .75rem; color: #7d8ba8; background: #202c45; font: .95rem/1.6 Consolas, "Courier New", monospace; text-align: right; user-select: none; }
+    .readonly-output { display: block; width: 100%; min-width: 0; min-height: 420px; padding: 1rem; resize: none; border: 1px solid #2d3b58; border-radius: 8px; color: #dce7ff; background: #172033; font: .95rem/1.6 Consolas, "Courier New", monospace; white-space: pre; }
+    .readonly-editor .readonly-output { flex: 1; min-height: 0; border: 0; border-radius: 0; }
+    .memory-map { height: 420px; overflow: auto; border: 1px solid #2d3b58; border-radius: 8px; background: #172033; }
+    .memory-table { width: 100%; min-width: 560px; border-collapse: collapse; table-layout: fixed; color: #dce7ff; font: .72rem/1.35 Consolas, "Courier New", monospace; }
+      .memory-table { width: 100%; min-width: 560px; border-collapse: collapse; table-layout: fixed; color: #dce7ff; font: .68rem/1.3 Consolas, "Courier New", monospace; white-space: nowrap; }
+    .memory-table thead { position: sticky; top: 0; z-index: 1; color: #b7c7e5; background: #202c45; }
+    .memory-table th, .memory-table td { padding: .3rem .4rem; border-bottom: 1px solid #2d3b58; }
+    .memory-table tbody th { font-weight: normal; text-align: left; }
+    .memory-table thead th:not(:first-child) { text-align: right; }
+    .memory-table td { color: #ffd580; text-align: right; }
+    .execution-actions { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .75rem; }
     .action { padding: .7rem 1rem; border: 0; border-radius: 6px; color: white; background: #356ae6; font: inherit; font-weight: bold; cursor: pointer; }
     @media (max-width: 1100px) { .workspace { padding: 0 3%; } .editor-layout { grid-template-columns: minmax(390px, .9fr) minmax(420px, 1.1fr); } }
+    @media (max-width: 760px) { .execution-layout { grid-template-columns: minmax(0, 1fr); } }
   </style>
 </head>
 <body>
@@ -64,9 +78,7 @@
     <section class="workspace" aria-label="Environnement de développement mu0">
       <nav class="tabs" aria-label="Vues du programme" role="tablist">
         <button class="tab" id="tab-editor" role="tab" aria-selected="true" aria-controls="panel-editor" data-panel="panel-editor">Éditeur de code</button>
-        <button class="tab" id="tab-compile" role="tab" aria-selected="false" aria-controls="panel-compile" data-panel="panel-compile">Compilation</button>
-        <button class="tab" id="tab-memory" role="tab" aria-selected="false" aria-controls="panel-memory" data-panel="panel-memory">Mémoire</button>
-        <button class="tab" id="tab-run" role="tab" aria-selected="false" aria-controls="panel-run" data-panel="panel-run">Exécution</button>
+        <button class="tab" id="tab-execution" role="tab" aria-selected="false" aria-controls="panel-execution" data-panel="panel-execution">Exécution</button>
       </nav>
 
       <section class="panel" id="panel-editor" role="tabpanel" aria-labelledby="tab-editor">
@@ -121,29 +133,30 @@ SUB 0x013</textarea>
         </div>
       </section>
 
-      <section class="panel panel-surface" id="panel-compile" role="tabpanel" aria-labelledby="tab-compile" hidden>
-        <h2>Compilation</h2>
-        <p>Assemblez le programme actuellement présent dans l’éditeur.</p>
-        <button class="action" id="compile-button" type="button">Compiler le code</button>
-        <pre class="compile-output" id="compile-output">En attente de compilation.</pre>
-      </section>
-
-      <section class="panel panel-surface" id="panel-memory" role="tabpanel" aria-labelledby="tab-memory" hidden>
-        <h2>Mémoire de l’émulateur</h2>
-        <div class="memory-grid" aria-label="Contenu de la mémoire">
-          <div class="memory-cell"><strong>0x0000</strong>0000</div>
-          <div class="memory-cell"><strong>0x0001</strong>0000</div>
-          <div class="memory-cell"><strong>0x0002</strong>0000</div>
-          <div class="memory-cell"><strong>0x0003</strong>0000</div>
-          <div class="memory-cell"><strong>0x0004</strong>0000</div>
-          <div class="memory-cell"><strong>0x0005</strong>0000</div>
+      <section class="panel panel-surface" id="panel-execution" role="tabpanel" aria-labelledby="tab-execution" hidden>
+        <div class="execution-layout">
+          <section class="execution-column" aria-labelledby="compiled-code-heading">
+            <h2 id="compiled-code-heading">Code compilé</h2>
+            <div class="readonly-editor">
+              <div class="readonly-gutter" aria-hidden="true">1</div>
+              <textarea class="readonly-output" id="compiled-code" aria-label="Code compilé" readonly>Le code compilé apparaîtra ici.</textarea>
+            </div>
+            <div class="execution-actions" aria-label="Commandes d’exécution">
+              <button class="action" id="start-button" type="button">Marche</button>
+              <button class="action" id="step-button" type="button">Pas à pas</button>
+              <button class="action" id="initialize-button" type="button">Initialisation</button>
+            </div>
+          </section>
+          <section class="execution-column" aria-labelledby="memory-output-heading">
+            <h2 id="memory-output-heading">Plan mémoire</h2>
+            <div class="memory-map" role="region" aria-label="Plan mémoire complet" tabindex="0">
+              <table class="memory-table" aria-label="Adresses 12 bits et données 16 bits en hexadécimal">
+                <thead><tr><th scope="col">Adr.</th><th scope="col">Mot +0x0</th><th scope="col">Mot +0x2</th><th scope="col">Mot +0x4</th><th scope="col">Mot +0x6</th><th scope="col">Mot +0x8</th><th scope="col">Mot +0xA</th><th scope="col">Mot +0xC</th><th scope="col">Mot +0xE</th></tr></thead>
+                <tbody id="memory-output"></tbody>
+              </table>
+            </div>
+          </section>
         </div>
-      </section>
-
-      <section class="panel panel-surface" id="panel-run" role="tabpanel" aria-labelledby="tab-run" hidden>
-        <h2>Exécution du code compilé</h2>
-        <button class="action" id="run-button" type="button">Exécuter</button>
-        <pre class="execution-output" id="execution-output">Le programme compilé n’a pas encore été exécuté.</pre>
       </section>
     </section>
   </main>
@@ -154,6 +167,7 @@ SUB 0x013</textarea>
     const codeHighlight = document.querySelector('.code-highlight');
     const editorStatus = document.querySelector('#editor-status');
     const suggestions = document.querySelector('#suggestions');
+    const memoryOutput = document.querySelector('#memory-output');
     const instructionNames = ['LDA', 'STO', 'ADD', 'SUB', 'JMP', 'JGE', 'JNE', 'STP', 'AND', 'OR', 'XOR', 'ROL', 'LDR', 'LDI', 'STI', 'XPC'];
     const directiveNames = ['.org', 'defw'];
     const addressInstructionNames = new Set(['LDA', 'STO', 'ADD', 'SUB', 'JMP', 'JGE', 'JNE', 'AND', 'OR', 'XOR', 'ROL', 'LDR', '.org']);
@@ -368,6 +382,24 @@ SUB 0x013</textarea>
       return false;
     }
 
+    function initializeMemoryMap() {
+      const rows = document.createDocumentFragment();
+      for (let address = 0; address < 0x1000; address += 0x10) {
+        const row = document.createElement('tr');
+        const addressCell = document.createElement('th');
+        addressCell.scope = 'row';
+        addressCell.textContent = `0x${address.toString(16).toUpperCase().padStart(3, '0')}`;
+        row.appendChild(addressCell);
+        for (let offset = 0; offset < 0x10; offset += 2) {
+          const dataCell = document.createElement('td');
+          dataCell.textContent = '0x0000';
+          row.appendChild(dataCell);
+        }
+        rows.appendChild(row);
+      }
+      memoryOutput.replaceChildren(rows);
+    }
+
     codeInput.addEventListener('input', updateEditor);
     codeInput.addEventListener('click', updateSuggestions);
     codeInput.addEventListener('keyup', updateEditor);
@@ -394,6 +426,7 @@ SUB 0x013</textarea>
       }
     });
     updateEditor();
+    initializeMemoryMap();
 
     document.querySelectorAll('.tab').forEach((tab) => {
       tab.addEventListener('click', () => {
@@ -406,14 +439,6 @@ SUB 0x013</textarea>
       });
     });
 
-    document.querySelector('#compile-button').addEventListener('click', () => {
-      const lineCount = codeInput.value.split('\n').length;
-      document.querySelector('#compile-output').textContent = `Compilation réussie. ${lineCount} lignes analysées.`;
-    });
-
-    document.querySelector('#run-button').addEventListener('click', () => {
-      document.querySelector('#execution-output').textContent = 'Exécution terminée. Sortie : Bonjour, mu0 ENIB !';
-    });
   </script>
 </body>
 </html>

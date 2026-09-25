@@ -1,59 +1,11 @@
-type ValidationResult = {
-  addressToken?: string;
-  error?: string;
-};
-
-type CompiledProgram = {
-  ok: boolean;
-  output: string;
-  memory: Map<number, number>;
-  instructions: number[];
-};
-
-type ExecutionResult = {
-  output: string;
-  acc: number;
-  pc: number;
-  r: number;
-};
-
 const instructionNames = [
-  'LDA',
-  'STO',
-  'ADD',
-  'SUB',
-  'JMP',
-  'JGE',
-  'JNE',
-  'STP',
-  'AND',
-  'OR',
-  'XOR',
-  'ROL',
-  'LDR',
-  'LDI',
-  'STI',
-  'XPC',
-] as const;
-
-const directiveNames = ['.org', 'defw'] as const;
-const addressInstructionNames = new Set<string>([
-  'LDA',
-  'STO',
-  'ADD',
-  'SUB',
-  'JMP',
-  'JGE',
-  'JNE',
-  'AND',
-  'OR',
-  'XOR',
-  'ROL',
-  'LDR',
-  '.ORG',
+  'LDA', 'STO', 'ADD', 'SUB', 'JMP', 'JGE', 'JNE', 'STP', 'AND', 'OR', 'XOR', 'ROL', 'LDR', 'LDI', 'STI', 'XPC'
+];
+const directiveNames = ['.org', 'defw'];
+const addressInstructionNames = new Set([
+  'LDA', 'STO', 'ADD', 'SUB', 'JMP', 'JGE', 'JNE', 'AND', 'OR', 'XOR', 'ROL', 'LDR', '.ORG'
 ]);
-
-const opcodeMap: Record<string, number> = {
+const opcodeMap = {
   LDA: 0x0,
   STO: 0x1,
   ADD: 0x2,
@@ -72,29 +24,27 @@ const opcodeMap: Record<string, number> = {
   XPC: 0xF,
 };
 
-export function escapeHtml(value: string): string {
+function escapeHtml(value) {
   return value.replace(/[&<>"/]/g, (character) => ({
     '&': '&amp;',
     '<': '&lt;',
     '>': '&gt;',
     '"': '&quot;',
-    '/': '&#x2F;',
-  }[character] ?? character));
+    '/': '&#x2F;'
+  }[character] || character));
 }
 
-export function validateLine(line: string): ValidationResult | null {
+function validateLine(line) {
   const code = line.split(';')[0];
   const tokens = code.trim().split(/\s+/).filter(Boolean);
-  if (tokens.length === 0) {
-    return null;
-  }
+  if (tokens.length === 0) return null;
 
   let label = '';
   let instructionToken = tokens[0];
   let operand = tokens[1];
   const firstToken = tokens[0].toUpperCase();
-  const isDirective = directiveNames.includes(tokens[0].toLowerCase() as (typeof directiveNames)[number]);
-  const isInstruction = instructionNames.includes(firstToken as (typeof instructionNames)[number]);
+  const isDirective = directiveNames.includes(tokens[0].toLowerCase());
+  const isInstruction = instructionNames.includes(firstToken);
 
   if (!isDirective && !isInstruction) {
     label = tokens[0];
@@ -102,16 +52,12 @@ export function validateLine(line: string): ValidationResult | null {
     operand = tokens[2];
   }
 
-  if (!instructionToken) {
-    return null;
-  }
-
+  if (!instructionToken) return null;
   if (label && label.length > 8) {
     return { addressToken: label, error: `Label trop long : ${label} (8 caractères maximum).` };
   }
 
   const instruction = instructionToken.startsWith('.') ? instructionToken.toLowerCase() : instructionToken.toUpperCase();
-
   if (instruction === 'DEFW') {
     if (!label) {
       return { error: 'La directive defw doit être précédée par un label.' };
@@ -145,24 +91,19 @@ export function validateLine(line: string): ValidationResult | null {
   return null;
 }
 
-export function formatInstructionLine(line: string): string {
+function formatInstructionLine(line) {
   const commentIndex = line.indexOf(';');
   const code = commentIndex >= 0 ? line.slice(0, commentIndex) : line;
   const comment = commentIndex >= 0 ? line.slice(commentIndex) : '';
   const tokens = code.trim().split(/\s+/).filter(Boolean);
-
-  if (tokens.length === 0) {
-    return line;
-  }
+  if (tokens.length === 0) return line;
 
   const firstToken = tokens[0].toUpperCase();
-  const hasLabel = !instructionNames.includes(firstToken as (typeof instructionNames)[number]) &&
-    !directiveNames.includes(tokens[0].toLowerCase() as (typeof directiveNames)[number]);
+  const hasLabel = !instructionNames.includes(firstToken) && !directiveNames.includes(tokens[0].toLowerCase());
   const instructionIndex = hasLabel ? 1 : 0;
   const instruction = tokens[instructionIndex];
-  const isDefw = instruction?.toLowerCase() === 'defw';
-
-  if (!instruction || (!instructionNames.includes(instruction.toUpperCase() as (typeof instructionNames)[number]) && !isDefw)) {
+  const isDefw = instruction && instruction.toLowerCase() === 'defw';
+  if (!instruction || (!instructionNames.includes(instruction.toUpperCase()) && !isDefw)) {
     return line;
   }
 
@@ -173,14 +114,14 @@ export function formatInstructionLine(line: string): string {
   return `${formatted}${comment ? ` ${comment.trim()}` : ''}`;
 }
 
-export function formatProgram(source: string): string {
+function formatProgram(source) {
   return source
     .split(/\r?\n/)
     .map((line) => formatInstructionLine(line))
     .join('\n');
 }
 
-function parseAddressToken(token: string, base = 10): number {
+function parseAddressToken(token, base = 10) {
   if (/^0x[0-9a-fA-F]+$/i.test(token)) {
     return Number.parseInt(token, 16);
   }
@@ -190,39 +131,24 @@ function parseAddressToken(token: string, base = 10): number {
   return Number.NaN;
 }
 
-function resolveOperand(operand: string, labels: Map<string, number>, fallback: number): number {
-  const directValue = parseAddressToken(operand, 10);
-  if (Number.isFinite(directValue)) {
-    return directValue & 0x0fff;
-  }
-
-  if (labels.has(operand)) {
-    return labels.get(operand)! & 0x0fff;
-  }
-
-  return fallback & 0x0fff;
-}
-
-export function compileProgram(source: string): CompiledProgram {
+function compileProgram(source) {
   const lines = source.split(/\r?\n/);
-  const labels = new Map<string, number>();
-  const memory = new Map<number, number>();
-  const instructions: number[] = [];
-  const fixups: Array<{ index: number; label: string; field: string }> = [];
+  const labels = new Map();
+  const memory = new Map();
+  const instructions = [];
+  const fixups = [];
   let currentAddress = 0;
-  const errors: string[] = [];
+  const errors = [];
 
   for (let index = 0; index < lines.length; index += 1) {
     const rawLine = lines[index];
     const code = rawLine.split(';')[0].trim();
-    if (!code) {
-      continue;
-    }
+    if (!code) continue;
 
     const tokens = code.split(/\s+/).filter(Boolean);
     const firstToken = tokens[0];
-    const isDirective = directiveNames.includes(firstToken.toLowerCase() as (typeof directiveNames)[number]);
-    const isInstruction = instructionNames.includes(firstToken.toUpperCase() as (typeof instructionNames)[number]);
+    const isDirective = directiveNames.includes(firstToken.toLowerCase());
+    const isInstruction = instructionNames.includes(firstToken.toUpperCase());
 
     let label = '';
     let instruction = firstToken;
@@ -230,7 +156,7 @@ export function compileProgram(source: string): CompiledProgram {
 
     if (!isDirective && !isInstruction) {
       label = firstToken;
-      instruction = tokens[1] ?? '';
+      instruction = tokens[1] || '';
       operand = tokens[2];
     }
 
@@ -241,7 +167,7 @@ export function compileProgram(source: string): CompiledProgram {
     const normalizedInstruction = instruction.startsWith('.') ? instruction.toLowerCase() : instruction.toUpperCase();
 
     if (normalizedInstruction === '.org') {
-      const value = parseAddressToken(operand ?? '', 10);
+      const value = parseAddressToken(operand || '', 10);
       if (!Number.isFinite(value) || value < 0 || value > 0xfff) {
         errors.push(`Ligne ${index + 1} : directive .org invalide.`);
         continue;
@@ -255,7 +181,7 @@ export function compileProgram(source: string): CompiledProgram {
         errors.push(`Ligne ${index + 1} : la directive defw doit être précédée d'un label.`);
         continue;
       }
-      const value = parseAddressToken(operand ?? '', 10);
+      const value = parseAddressToken(operand || '', 10);
       if (!Number.isFinite(value) || value < 0 || value > 0xffff) {
         errors.push(`Ligne ${index + 1} : valeur invalide pour defw.`);
         continue;
@@ -285,7 +211,6 @@ export function compileProgram(source: string): CompiledProgram {
 
     const directValue = parseAddressToken(operand, 10);
     const resolvedValue = Number.isFinite(directValue) ? directValue & 0x0fff : null;
-
     const word = (opcodeMap[normalizedInstruction] << 12) | (resolvedValue ?? 0);
     instructions.push(word);
 
@@ -314,22 +239,16 @@ export function compileProgram(source: string): CompiledProgram {
     };
   }
 
-  const summary = [
-    `Compilation réussie. ${instructions.length} instruction(s) assemblée(s).`,
-    `Mémoire allouée : ${Math.max(0, currentAddress)} mots.`,
-  ];
-
   return {
     ok: true,
-    output: summary.join('\n'),
+    output: `Compilation réussie. ${instructions.length} instruction(s) assemblée(s).\nMémoire allouée : ${Math.max(0, currentAddress)} mots.`,
     memory,
     instructions,
   };
 }
 
-export function executeProgram(source: string): ExecutionResult {
+function executeProgram(source) {
   const compiled = compileProgram(source);
-
   if (!compiled.ok) {
     return {
       output: `Erreur de compilation\n${compiled.output}`,
@@ -349,7 +268,7 @@ export function executeProgram(source: string): ExecutionResult {
   let acc = 0;
   let r = 0;
   let step = 0;
-  const trace: string[] = [];
+  const trace = [];
 
   while (step < 256) {
     const instructionWord = program[pc] ?? 0;
@@ -377,9 +296,11 @@ export function executeProgram(source: string): ExecutionResult {
       case 0x4:
         pc = operand;
         break;
-      case 0x5:
-        pc = acc >= 0 ? operand : pc + 1;
+      case 0x5: {
+        const signed = (acc & 0x8000) ? acc - 0x10000 : acc;
+        pc = signed >= 0 ? operand : pc + 1;
         break;
+      }
       case 0x6:
         pc = acc !== 0 ? operand : pc + 1;
         break;
@@ -429,13 +350,8 @@ export function executeProgram(source: string): ExecutionResult {
         pc += 1;
     }
 
-    if (opcode === 0x7) {
-      break;
-    }
-
-    if (pc < 0 || pc >= program.length) {
-      break;
-    }
+    if (opcode === 0x7) break;
+    if (pc < 0 || pc >= program.length) break;
     step += 1;
   }
 
@@ -447,15 +363,10 @@ export function executeProgram(source: string): ExecutionResult {
     ...trace,
   ].join('\n');
 
-  return {
-    output,
-    acc,
-    pc,
-    r,
-  };
+  return { output, acc, pc, r };
 }
 
-function normalizeInstructions(code: string): string {
+function normalizeInstructions(code) {
   return code
     .split(/\r?\n/)
     .map((line) => line.replace(/^([ \t]*)([A-Za-z_][A-Za-z0-9_]*)\b/, (match, indentation, typedName) => {
@@ -465,12 +376,12 @@ function normalizeInstructions(code: string): string {
     .join('\n');
 }
 
-function updateLineNumbers(codeInput: HTMLTextAreaElement, lineNumbersElement: HTMLElement): void {
+function updateLineNumbers(codeInput, lineNumbersElement) {
   const lineCount = codeInput.value.split(/\r?\n/).length;
   lineNumbersElement.textContent = Array.from({ length: lineCount }, (_, index) => index + 1).join('\n');
 }
 
-function updateHighlight(codeInput: HTMLTextAreaElement, highlightElement: HTMLElement): void {
+function updateHighlight(codeInput, highlightElement) {
   const lines = codeInput.value.split(/\r?\n/);
   const highlighted = lines
     .map((line) => {
@@ -478,7 +389,7 @@ function updateHighlight(codeInput: HTMLTextAreaElement, highlightElement: HTMLE
       const tokenPattern = /(;.*$|\.(?:org)\b|\bdefw\b|\b(?:LDA|STO|ADD|SUB|JMP|JGE|JNE|STP|AND|OR|XOR|ROL|LDR|LDI|STI|XPC)\b|\b[A-Za-z_][A-Za-z0-9_]*\b|\b(?:0x[0-9a-fA-F]+|\d+)\b)/g;
       let html = '';
       let lastIndex = 0;
-      let match: RegExpExecArray | null;
+      let match;
       const firstTokenIndex = line.search(/\S/);
       const labelMatch = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s+(?=(?:defw|LDA|STO|ADD|SUB|JMP|JGE|JNE|STP|AND|OR|XOR|ROL|LDR|LDI|STI|XPC)\b)/i);
       const labelIndex = labelMatch ? line.indexOf(labelMatch[1], firstTokenIndex) : -1;
@@ -491,17 +402,16 @@ function updateHighlight(codeInput: HTMLTextAreaElement, highlightElement: HTMLE
         const isOperand = /^(?:0x[0-9a-fA-F]+|\d+)$/.test(token);
         const isSymbolicOperand = /^[A-Za-z_][A-Za-z0-9_]*$/.test(token)
           && !isFirstToken
-          && !instructionNames.includes(token.toUpperCase() as (typeof instructionNames)[number])
-          && !directiveNames.includes(token.toLowerCase() as (typeof directiveNames)[number]);
-        const isInvalidAddress = validation?.addressToken === token;
-
+          && !instructionNames.includes(token.toUpperCase())
+          && !directiveNames.includes(token.toLowerCase());
+        const isInvalidAddress = validation && validation.addressToken === token;
         const className = token.startsWith(';')
           ? 'syntax-comment'
-          : directiveNames.includes(token.toLowerCase() as (typeof directiveNames)[number])
+          : directiveNames.includes(token.toLowerCase())
             ? 'syntax-directive'
             : isLabel || isSymbolicOperand
               ? 'syntax-label'
-              : instructionNames.includes(token.toUpperCase() as (typeof instructionNames)[number])
+              : instructionNames.includes(token.toUpperCase())
                 ? 'syntax-instruction'
                 : isInvalidAddress
                   ? 'syntax-invalid'
@@ -510,7 +420,6 @@ function updateHighlight(codeInput: HTMLTextAreaElement, highlightElement: HTMLE
                     : isFirstToken
                       ? 'syntax-invalid'
                       : '';
-
         html += className ? `<span class="${className}">${escapeHtml(token)}</span>` : escapeHtml(token);
         lastIndex = tokenPattern.lastIndex;
       }
@@ -523,7 +432,7 @@ function updateHighlight(codeInput: HTMLTextAreaElement, highlightElement: HTMLE
   highlightElement.innerHTML = highlighted;
 }
 
-function updateSuggestions(codeInput: HTMLTextAreaElement, suggestionsElement: HTMLElement): void {
+function updateSuggestions(codeInput, suggestionsElement) {
   const cursor = codeInput.selectionStart;
   const beforeCursor = codeInput.value.slice(0, cursor);
   const currentLine = beforeCursor.slice(beforeCursor.lastIndexOf('\n') + 1);
@@ -556,7 +465,7 @@ function updateSuggestions(codeInput: HTMLTextAreaElement, suggestionsElement: H
   });
 }
 
-function updateValidation(editorStatusElement: HTMLElement, code: string): void {
+function updateValidation(editorStatusElement, code) {
   const errors = code
     .split(/\r?\n/)
     .map((line, index) => ({ index: index + 1, validation: validateLine(line) }))
@@ -564,22 +473,22 @@ function updateValidation(editorStatusElement: HTMLElement, code: string): void 
 
   editorStatusElement.classList.toggle('has-error', errors.length > 0);
   editorStatusElement.textContent = errors.length
-    ? errors.map((item) => `Ligne ${item.index} : ${item.validation?.error}`).join(' ')
+    ? errors.map((item) => `Ligne ${item.index} : ${item.validation.error}`).join(' ')
     : 'Adresses : 0x000 à 0xFFF | Données ACC : 16 bits, 0x0000 à 0xFFFF.';
 }
 
-function syncEditorScroll(codeInput: HTMLTextAreaElement, lineNumbersElement: HTMLElement, highlightElement: HTMLElement): void {
+function syncEditorScroll(codeInput, lineNumbersElement, highlightElement) {
   lineNumbersElement.scrollTop = codeInput.scrollTop;
   highlightElement.scrollTop = codeInput.scrollTop;
   highlightElement.scrollLeft = codeInput.scrollLeft;
 }
 
-function updateEditor(): void {
-  const codeInput = document.querySelector<HTMLTextAreaElement>('.code-input');
-  const lineNumbersElement = document.querySelector<HTMLElement>('.line-numbers');
-  const highlightElement = document.querySelector<HTMLElement>('.code-highlight');
-  const editorStatusElement = document.querySelector<HTMLElement>('#editor-status');
-  const suggestionsElement = document.querySelector<HTMLElement>('#suggestions');
+function updateEditor() {
+  const codeInput = document.querySelector('.code-input');
+  const lineNumbersElement = document.querySelector('.line-numbers');
+  const highlightElement = document.querySelector('.code-highlight');
+  const editorStatusElement = document.querySelector('#editor-status');
+  const suggestionsElement = document.querySelector('#suggestions');
 
   if (!codeInput || !lineNumbersElement || !highlightElement || !editorStatusElement || !suggestionsElement) {
     return;
@@ -600,16 +509,15 @@ function updateEditor(): void {
   updateSuggestions(codeInput, suggestionsElement);
 }
 
-function boot(): void {
-  const codeInput = document.querySelector<HTMLTextAreaElement>('.code-input');
-  const editorStatusElement = document.querySelector<HTMLElement>('#editor-status');
-  const compileOutput = document.querySelector<HTMLElement>('#compile-output');
-  const executionOutput = document.querySelector<HTMLElement>('#execution-output');
-  const suggestionsElement = document.querySelector<HTMLElement>('#suggestions');
-  const compileButton = document.querySelector<HTMLButtonElement>('#compile-button');
-  const runButton = document.querySelector<HTMLButtonElement>('#run-button');
+function boot() {
+  const codeInput = document.querySelector('.code-input');
+  const compileOutput = document.querySelector('#compile-output');
+  const executionOutput = document.querySelector('#execution-output');
+  const suggestionsElement = document.querySelector('#suggestions');
+  const compileButton = document.querySelector('#compile-button');
+  const runButton = document.querySelector('#run-button');
 
-  if (!codeInput || !editorStatusElement || !compileOutput || !executionOutput || !suggestionsElement || !compileButton || !runButton) {
+  if (!codeInput || !compileOutput || !executionOutput || !suggestionsElement || !compileButton || !runButton) {
     return;
   }
 
@@ -622,46 +530,46 @@ function boot(): void {
     updateEditor();
   });
   codeInput.addEventListener('scroll', () => {
-    const lineNumbersElement = document.querySelector<HTMLElement>('.line-numbers');
-    const highlightElement = document.querySelector<HTMLElement>('.code-highlight');
+    const lineNumbersElement = document.querySelector('.line-numbers');
+    const highlightElement = document.querySelector('.code-highlight');
     if (lineNumbersElement && highlightElement) {
       syncEditorScroll(codeInput, lineNumbersElement, highlightElement);
     }
   });
 
   codeInput.addEventListener('keydown', (event) => {
-    const availableSuggestions = suggestionsElement.querySelectorAll<HTMLButtonElement>('.suggestion');
+    const availableSuggestions = suggestionsElement.querySelectorAll('.suggestion');
     if (suggestionsElement.hidden || availableSuggestions.length === 0) {
       return;
     }
 
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      const currentIndex = Number(suggestionsElement.dataset.index ?? '0');
+      const currentIndex = Number(suggestionsElement.dataset.index || '0');
       const nextIndex = (currentIndex + 1) % availableSuggestions.length;
       suggestionsElement.dataset.index = String(nextIndex);
       availableSuggestions[nextIndex]?.focus();
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
-      const currentIndex = Number(suggestionsElement.dataset.index ?? '0');
+      const currentIndex = Number(suggestionsElement.dataset.index || '0');
       const nextIndex = (currentIndex - 1 + availableSuggestions.length) % availableSuggestions.length;
       suggestionsElement.dataset.index = String(nextIndex);
       availableSuggestions[nextIndex]?.focus();
     } else if (event.key === 'Tab' || event.key === 'Enter') {
       event.preventDefault();
-      const activeIndex = Number(suggestionsElement.dataset.index ?? '0');
+      const activeIndex = Number(suggestionsElement.dataset.index || '0');
       availableSuggestions[activeIndex]?.click();
     } else if (event.key === 'Escape') {
       suggestionsElement.hidden = true;
     }
   });
 
-  document.querySelectorAll<HTMLButtonElement>('.tab').forEach((tab) => {
+  document.querySelectorAll('.tab').forEach((tab) => {
     tab.addEventListener('click', () => {
-      document.querySelectorAll<HTMLButtonElement>('.tab').forEach((button) => {
+      document.querySelectorAll('.tab').forEach((button) => {
         button.setAttribute('aria-selected', button === tab ? 'true' : 'false');
       });
-      document.querySelectorAll<HTMLElement>('.panel').forEach((panel) => {
+      document.querySelectorAll('.panel').forEach((panel) => {
         panel.hidden = panel.id !== tab.dataset.panel;
       });
     });
